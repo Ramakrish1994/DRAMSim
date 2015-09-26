@@ -160,25 +160,13 @@ void MemoryController::attachRanks(vector<Rank *> *ranks)
 int MemoryController::select_read_or_write_queue() {
 	int start_index = 0;
 	if (write_flag) {
-		if (num_consecutive_writes > 3) {
-			if (num_read_queue_entries >= 24) {
-				write_flag = false;
-				num_consecutive_writes = 0;
-			}
-			else {
-				num_consecutive_writes++;
-				start_index = num_read_queue_entries;
-			}
+		if (num_write_queue_entries <= 6 && num_read_queue_entries != 0) {
+			write_flag = false;
+			num_consecutive_writes = 0;
 		}
 		else {
-			if (num_write_queue_entries <= 6 && num_read_queue_entries == 0) {
-				write_flag = false;
-				num_consecutive_writes = 0;
-			}
-			else {
-			    num_consecutive_writes++;
-			    start_index = num_read_queue_entries;
-			}
+			num_consecutive_writes++;
+			start_index = num_read_queue_entries;
 		}
 	}
 	else {
@@ -187,10 +175,8 @@ int MemoryController::select_read_or_write_queue() {
 			num_consecutive_writes++;
 			write_flag = true;
 		}
-		else if (num_read_queue_entries == 0) {
-			start_index = num_read_queue_entries;
-		}
 	}
+	return start_index;
 }
 
 
@@ -540,7 +526,6 @@ void MemoryController::update()
 	else {
 		index = 0;
 	}
-	PRINT(num_write_queue_entries);
 	for (size_t i=index; i<transactionQueue.size();i++)
 	{
 		//pop off top transaction from queue
@@ -576,15 +561,16 @@ void MemoryController::update()
 				PRINT("  Col  : " << newTransactionColumn);
 			}
 
-
-			//now that we know there is room in the command queue, we can remove from the transaction queue
-			transactionQueue.erase(transactionQueue.begin()+i);
+            
 			if (TQ_POLICY == "ROW" && transaction->transactionType == DATA_READ) {
 				num_read_queue_entries--;
+				PRINT ("Here!" << num_read_queue_entries);
 			}
 			else if (TQ_POLICY == "ROW") {
 				num_write_queue_entries--;
 			}
+			//now that we know there is room in the command queue, we can remove from the transaction queue
+			transactionQueue.erase(transactionQueue.begin()+i);
 
 			//create activate command to the row we just translated
 			BusPacket *ACTcommand = new BusPacket(ACTIVATE, transaction->address,
@@ -839,8 +825,20 @@ bool MemoryController::addTransaction(Transaction *trans)
 		{
 			trans->timeAdded = currentClockCycle;
 			if (trans->transactionType == DATA_READ) {
+				bool forwarded = false;
+				// Read Forwarding from Writes for Consistency
+				for (int i = transactionQueue.size() - 1; i >= num_read_queue_entries; --i) {
+					if (transactionQueue[i]->address == trans->address) {
+						returnTransaction.push_back(new Transaction(RETURN_DATA, trans->address, transactionQueue[i]->data));
+						pendingReadTransactions.push_back(trans);
+						forwarded = true;
+						break;
+					}
+				}
+				if (!forwarded) {
 				transactionQueue.insert (transactionQueue.begin() + num_read_queue_entries, trans);
 				num_read_queue_entries++;
+				}
 			}
 			if (trans->transactionType == DATA_WRITE) {
 				transactionQueue.push_back (trans);

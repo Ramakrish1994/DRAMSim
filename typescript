@@ -1,0 +1,27 @@
+Script started on Sat Sep 26 23:13:25 2015
+[?1034h[36msanjay[m@[32mSanjays-MacBook-Pro:[33;1m~/Documents/IITM/PROGRAMMING/CS4110/Assignment3/DRAMSim2[m$ vim count_1w100k.txtls[Kcd Data/ls[Kmvim typos-test.txt [3@Data/count_1w[C[C[C[C[Cspell-check-words.py[11Popen main.pdf [1Pvim[C[C[C[C[C[C[C[C[C[C[1@open[C[C[C[C[C[C[C[C[C[Cmvim spell-check-words.py[2PData/count_1w.txt [3Ptypos-test[C[C[C[C[Cls[Kcd Data/ls[Kvim count_1w100k.txt[K./DRAMSim -t traces/k6_aoe_02_short.trc -s system_param.ini -d ini/DDR3_micron_32M_8B_x4_sg125.i ni -c 4500000 > k6_open_norow.txt 
+== Loading trace file 'traces/k6_aoe_02_short.trc' == 
+== Loading device model file 'ini/DDR3_micron_32M_8B_x4_sg125.ini' == 
+== Loading system model file 'system_param.ini' == 
+WARNING: KEY TQ_POLICY NOT FOUND IN INI FILE.
+===== MemorySystem 0 =====
+CH. 0 TOTAL_STORAGE : 2048MB | 1 Ranks | 16 Devices per rank
+===== MemorySystem 1 =====
+CH. 1 TOTAL_STORAGE : 2048MB | 1 Ranks | 16 Devices per rank
+writing vis file to results/k6_aoe_02_short.trc/DDR3_micron_32M_8B_x4_sg125/2GB.2Ch.1R.scheme7.open_page.64TQ.64CQ.RtB.pRank.vis
+DRAMSim2 Clock Frequency =800000000Hz, CPU Clock Frequency=800000000Hz
+[36msanjay[m@[32mSanjays-MacBook-Pro:[33;1m~/Documents/IITM/PROGRAMMING/CS4110/Assignment3/DRAMSim2[m$ ./DRAMSim -t traces/k6_aoe_02_short.trc -s system_param.ini -d ini/DDR3_micron_32M_8B_x4_sg125.inni -c 4500000 > k6_open_norow.txt [1P[1P[1P[1P[1@c[1@l[1@o[1@s[1@e
+== Loading trace file 'traces/k6_aoe_02_short.trc' == 
+== Loading device model file 'ini/DDR3_micron_32M_8B_x4_sg125.ini' == 
+== Loading system model file 'system_param.ini' == 
+WARNING: KEY TQ_POLICY NOT FOUND IN INI FILE.
+===== MemorySystem 0 =====
+CH. 0 TOTAL_STORAGE : 2048MB | 1 Ranks | 16 Devices per rank
+===== MemorySystem 1 =====
+CH. 1 TOTAL_STORAGE : 2048MB | 1 Ranks | 16 Devices per rank
+writing vis file to results/k6_aoe_02_short.trc/DDR3_micron_32M_8B_x4_sg125/2GB.2Ch.1R.scheme7.close_page.64TQ.64CQ.RtB.pRank.vis
+DRAMSim2 Clock Frequency =800000000Hz, CPU Clock Frequency=800000000Hz
+[36msanjay[m@[32mSanjays-MacBook-Pro:[33;1m~/Documents/IITM/PROGRAMMING/CS4110/Assignment3/DRAMSim2[m$ exit
+exit
+
+Script done on Sat Sep 26 23:14:22 2015

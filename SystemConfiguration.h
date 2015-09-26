@@ -131,6 +131,8 @@ extern unsigned JEDEC_DATA_BUS_BITS;
 
 //Memory Controller related parameters
 extern unsigned TRANS_QUEUE_DEPTH;
+extern unsigned READ_TRANS_QUEUE_DEPTH;
+extern unsigned WRITE_TRANS_QUEUE_DEPTH;
 extern unsigned CMD_QUEUE_DEPTH;
 
 extern unsigned EPOCH_LENGTH;
@@ -141,6 +143,7 @@ extern std::string ROW_BUFFER_POLICY;
 extern std::string SCHEDULING_POLICY;
 extern std::string ADDRESS_MAPPING_SCHEME;
 extern std::string QUEUING_STRUCTURE;
+extern std::string TQ_POLICY;
 
 enum TraceType
 {

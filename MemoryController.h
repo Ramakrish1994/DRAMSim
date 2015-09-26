@@ -62,6 +62,7 @@ public:
 
 	bool addTransaction(Transaction *trans);
 	bool WillAcceptTransaction();
+	bool WillAcceptTransaction(TransactionType trans);
 	void returnReadData(const Transaction *trans);
 	void receiveFromBus(BusPacket *bpacket);
 	void attachRanks(vector<Rank *> *ranks);
@@ -72,6 +73,11 @@ public:
 
 	//fields
 	vector<Transaction *> transactionQueue;
+	// functions for read over write scheduling
+	int num_read_queue_entries, num_write_queue_entries;
+	bool write_flag;
+	int num_consecutive_writes;
+	int select_read_or_write_queue();
 private:
 	ostream &dramsim_log;
 	vector< vector <BankState> > bankStates;

@@ -67,7 +67,10 @@ MemoryController::MemoryController(MemorySystem *parent, CSVWriter &csvOut_, ost
 		poppedBusPacket(NULL),
 		csvOut(csvOut_),
 		totalTransactions(0),
-		refreshRank(0)
+		refreshRank(0),
+		num_read_queue_entries(0),
+		num_write_queue_entries(0),
+		write_flag(false)
 {
 	//get handle on parent
 	parentMemorySystem = parent;
@@ -83,7 +86,12 @@ MemoryController::MemoryController(MemorySystem *parent, CSVWriter &csvOut_, ost
 	currentClockCycle = 0;
 
 	//reserve memory for vectors
-	transactionQueue.reserve(TRANS_QUEUE_DEPTH);
+	if (TQ_POLICY == "ROW") {
+	    transactionQueue.reserve(READ_TRANS_QUEUE_DEPTH + WRITE_TRANS_QUEUE_DEPTH);
+	}
+	else {
+	    transactionQueue.reserve(TRANS_QUEUE_DEPTH);
+	}
 	powerDown = vector<bool>(NUM_RANKS,false);
 	grandTotalBankAccesses = vector<uint64_t>(NUM_RANKS*NUM_BANKS,0);
 	totalReadsPerBank = vector<uint64_t>(NUM_RANKS*NUM_BANKS,0);
@@ -148,6 +156,43 @@ void MemoryController::attachRanks(vector<Rank *> *ranks)
 {
 	this->ranks = ranks;
 }
+
+int MemoryController::select_read_or_write_queue() {
+	int start_index = 0;
+	if (write_flag) {
+		if (num_consecutive_writes > 3) {
+			if (num_read_queue_entries >= 24) {
+				write_flag = false;
+				num_consecutive_writes = 0;
+			}
+			else {
+				num_consecutive_writes++;
+				start_index = num_read_queue_entries;
+			}
+		}
+		else {
+			if (num_write_queue_entries <= 6 && num_read_queue_entries == 0) {
+				write_flag = false;
+				num_consecutive_writes = 0;
+			}
+			else {
+			    num_consecutive_writes++;
+			    start_index = num_read_queue_entries;
+			}
+		}
+	}
+	else {
+	    if (num_write_queue_entries >= 24) {
+		    start_index = num_read_queue_entries;
+			num_consecutive_writes++;
+			write_flag = true;
+		}
+		else if (num_read_queue_entries == 0) {
+			start_index = num_read_queue_entries;
+		}
+	}
+}
+
 
 //memory controller update
 void MemoryController::update()
@@ -488,8 +533,15 @@ void MemoryController::update()
 		cmdCyclesLeft = tCMD;
 
 	}
-
-	for (size_t i=0;i<transactionQueue.size();i++)
+	int index = 0;
+	if (TQ_POLICY == "ROW") {
+	    index = select_read_or_write_queue();
+	}
+	else {
+		index = 0;
+	}
+	PRINT(num_write_queue_entries);
+	for (size_t i=index; i<transactionQueue.size();i++)
 	{
 		//pop off top transaction from queue
 		//
@@ -509,7 +561,7 @@ void MemoryController::update()
 		{
 			if (DEBUG_ADDR_MAP) 
 			{
-				PRINTN("== New Transaction - Mapping Address [0x" << hex << transaction->address << dec << "]");
+				PRINT("== New Transaction - Mapping Address [0x" << hex << transaction->address << dec << "]");
 				if (transaction->transactionType == DATA_READ) 
 				{
 					PRINT(" (Read)");
@@ -525,9 +577,14 @@ void MemoryController::update()
 			}
 
 
-
 			//now that we know there is room in the command queue, we can remove from the transaction queue
 			transactionQueue.erase(transactionQueue.begin()+i);
+			if (TQ_POLICY == "ROW" && transaction->transactionType == DATA_READ) {
+				num_read_queue_entries--;
+			}
+			else if (TQ_POLICY == "ROW") {
+				num_write_queue_entries--;
+			}
 
 			//create activate command to the row we just translated
 			BusPacket *ACTcommand = new BusPacket(ACTIVATE, transaction->address,
@@ -710,7 +767,7 @@ void MemoryController::update()
 	//
 	if (DEBUG_TRANS_Q)
 	{
-		PRINT("== Printing transaction queue");
+		PRINT("== Printing transaction queue "<<transactionQueue.size());
 		for (size_t i=0;i<transactionQueue.size();i++)
 		{
 			PRINTN("  " << i << "] "<< *transactionQueue[i]);
@@ -764,18 +821,49 @@ bool MemoryController::WillAcceptTransaction()
 	return transactionQueue.size() < TRANS_QUEUE_DEPTH;
 }
 
+bool MemoryController::WillAcceptTransaction(TransactionType transType)
+{
+	if (transType == DATA_READ) {
+		return num_read_queue_entries < READ_TRANS_QUEUE_DEPTH;
+	}
+	else if (transType == DATA_WRITE) {
+		return num_write_queue_entries < WRITE_TRANS_QUEUE_DEPTH;
+	}
+}
+
 //allows outside source to make request of memory system
 bool MemoryController::addTransaction(Transaction *trans)
 {
-	if (WillAcceptTransaction())
-	{
-		trans->timeAdded = currentClockCycle;
-		transactionQueue.push_back(trans);
-		return true;
+	if (TQ_POLICY == "ROW") {
+		if (WillAcceptTransaction(trans->transactionType))
+		{
+			trans->timeAdded = currentClockCycle;
+			if (trans->transactionType == DATA_READ) {
+				transactionQueue.insert (transactionQueue.begin() + num_read_queue_entries, trans);
+				num_read_queue_entries++;
+			}
+			if (trans->transactionType == DATA_WRITE) {
+				transactionQueue.push_back (trans);
+				num_write_queue_entries++;
+			}
+			return true;
+		}
+		else 
+		{
+			return false;
+		}
 	}
-	else 
-	{
-		return false;
+	else {
+		if (WillAcceptTransaction())
+		{
+			trans->timeAdded = currentClockCycle;
+			transactionQueue.push_back (trans);
+			return true;
+		}
+		else 
+		{
+			return false;
+		}
 	}
 }
 
@@ -918,14 +1006,21 @@ void MemoryController::printStats(bool finalStats)
 		}
 
 		map<unsigned,unsigned>::iterator it; //
+		double avg_read_latency = 0;
+		long long int frequency_sum = 0;
 		for (it=latencies.begin(); it!=latencies.end(); it++)
 		{
 			PRINT( "       ["<< it->first <<"-"<<it->first+(HISTOGRAM_BIN_SIZE-1)<<"] : "<< it->second );
+			avg_read_latency += (it->first + HISTOGRAM_BIN_SIZE/2) * it->second;
+			frequency_sum += it->second;
 			if (VIS_FILE_OUTPUT)
 			{
 				csvOut.getOutputStream() << it->first <<"="<< it->second << endl;
 			}
 		}
+		avg_read_latency /= frequency_sum;
+		PRINT(" --- Average Read Latency : "<<avg_read_latency);
+		PRINT(TQ_POLICY);
 		if (currentClockCycle % EPOCH_LENGTH == 0)
 		{
 			PRINT( " --- Grand Total Bank usage list");

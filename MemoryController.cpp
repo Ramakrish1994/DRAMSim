@@ -835,9 +835,17 @@ bool MemoryController::addTransaction(Transaction *trans)
 						break;
 					}
 				}
-				if (!forwarded) {
-				transactionQueue.insert (transactionQueue.begin() + num_read_queue_entries, trans);
-				num_read_queue_entries++;
+				bool clubbed = false;
+				// If there is no write, I can possible combine with a Read
+				for (int i = 0; i < num_read_queue_entries; ++i) {
+					if (transactionQueue[i]->address == trans->address) {
+						clubbed = true;
+						break;
+					}
+				}
+				if (!forwarded && !clubbed) {
+					transactionQueue.insert (transactionQueue.begin() + num_read_queue_entries, trans);
+					num_read_queue_entries++;
 				}
 			}
 			if (trans->transactionType == DATA_WRITE) {
